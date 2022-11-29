@@ -1,5 +1,9 @@
 import { sanityClient, urlFor, usePreviewSubscription, PortableText} from "../../lib/sanity";
-import { useState } from "react";
+import { useState, lazy } from "react";
+import { PreviewSuspense } from "next-sanity/preview";
+
+import {DocumentsCount, query} from './components/PreviewDocumentsCount';
+const PreviewDocumentsCount = lazy(() => import('./components/PreviewDocumentsCount'))
 
 const recipeQuery = `*[_type == "recipe" && slug.current == $slug][0] {
     _id,
@@ -26,7 +30,14 @@ const recipeQuery = `*[_type == "recipe" && slug.current == $slug][0] {
 //     }
 // },
 
-export default function OneRecipe({data}) {
+export default function OneRecipe({data, preview}) {
+
+    const { data: recipe} = usePreviewSubscription(recipeQuery, {
+        params: { slug: data.recipe?.slug.current },
+        initialData: data,
+        // enabled: preview,
+    });
+
     const [likes, setLikes] = useState(data?.recipe?.likes);
 
     const addLike = async () => {
@@ -40,7 +51,15 @@ export default function OneRecipe({data}) {
         setLikes(data.likes);
     };
 
-    const { recipe } = data;
+    // const { recipe } = data;
+    if (preview) {
+        return (
+            <PreviewSuspense fallback={<DocumentsCount data={data}/>}>
+                <PreviewDocumentsCount/>
+            </PreviewSuspense>
+        )
+    }
+
     return (
         <article className="recipe">
             <h1>{recipe.name}</h1>
@@ -90,5 +109,5 @@ export async function getStaticProps({ params }) {
     const { slug } = params;
     const recipe = await sanityClient.fetch(recipeQuery, {slug});
 
-    return { props: { data: { recipe } } };
+    return { props: { data: { recipe }, preview: true } };
 }
